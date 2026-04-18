@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.jlite</groupId>
+    <artifactId>jlite-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>jlite-mcp</artifactId>
+  <n>JLite MCP Server</n>
+  <description>
+    Protocol adapter — no LLM, no intelligence. Exposes JLite as structured
+    AI-callable tools via the Model Context Protocol (stdio + SSE transports).
+    Tools: execute_query, list_tables, describe_table, get_execution_plan,
+           begin_transaction, commit_transaction, rollback_transaction.
+    Any MCP-compatible client (Claude Desktop, Cursor, custom agent) can connect
+    and use JLite without knowing anything about SQL or Java.
+  </description>
+  <dependencies>
+    <dependency>
+      <groupId>io.jlite</groupId>
+      <artifactId>jlite-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <!--
+      TODO: replace with official MCP Java SDK once stable.
+      Tracking: https://github.com/modelcontextprotocol/java-sdk
+    -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+    </dependency>
+  </dependencies>
+</project>
