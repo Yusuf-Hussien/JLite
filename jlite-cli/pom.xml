@@ -10,7 +10,7 @@
     <version>0.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>jlite-cli</artifactId>
-  <n>JLite CLI</n>
+  <name>JLite CLI</name>
   <description>Interactive REPL shell with JLine3 readline, meta-commands, remote connect.</description>
   <dependencies>
     <dependency>
