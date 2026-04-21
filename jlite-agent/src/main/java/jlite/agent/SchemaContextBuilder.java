@@ -1,5 +1,8 @@
 package jlite.agent;
 
+import java.util.Comparator;
+import java.util.stream.Collectors;
+
 import jlite.catalogue.Catalogue;
 
 /**
@@ -21,7 +24,23 @@ public class SchemaContextBuilder {
     }
 
     public String build() {
-        // TODO: implement
-        throw new UnsupportedOperationException("SchemaContextBuilder.build() not yet implemented");
+        return catalogue.allTables().stream()
+            .sorted(Comparator.comparing(table -> table.name().toLowerCase()))
+            .map(table -> {
+                var columns = table.columns().stream()
+                    .map(column -> {
+                        var suffix = new StringBuilder();
+                        if (column.primaryKey()) {
+                            suffix.append(" PK");
+                        }
+                        if (!column.nullable()) {
+                            suffix.append(" NOT_NULL");
+                        }
+                        return column.name() + " " + column.type().name() + suffix;
+                    })
+                    .collect(Collectors.joining(", "));
+                return table.name() + "(" + columns + ")";
+            })
+            .collect(Collectors.joining("\n"));
     }
 }

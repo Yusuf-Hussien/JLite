@@ -10,7 +10,7 @@
     <version>0.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>jlite-agent</artifactId>
-  <n>JLite NL Agent</n>
+  <name>JLite NL Agent</name>
   <description>
     AI-powered application layer — completely separate from the MCP Server.
     Accepts free-form English questions, injects live schema context into a

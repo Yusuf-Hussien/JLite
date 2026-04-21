@@ -1,6 +1,10 @@
 package jlite.agent;
 
+import jlite.analyser.Analyser;
 import jlite.catalogue.Catalogue;
+import jlite.lexer.Lexer;
+import jlite.lexer.LexerException;
+import jlite.parser.ParseException;
 import jlite.parser.Parser;
 
 /**
@@ -22,8 +26,19 @@ public class SqlValidator {
     }
 
     public ValidationResult validate(String sql) {
-        // TODO: implement
-        throw new UnsupportedOperationException("SqlValidator.validate() not yet implemented");
+        if (sql == null || sql.isBlank()) {
+            return new ValidationResult(false, "SQL is empty");
+        }
+
+        try {
+            var statement = new Parser(new Lexer(sql).tokenise()).parseStatement();
+            new Analyser(catalogue).validate(statement);
+            return new ValidationResult(true, null);
+        } catch (LexerException | ParseException ex) {
+            return new ValidationResult(false, "Syntax error: " + ex.getMessage());
+        } catch (RuntimeException ex) {
+            return new ValidationResult(false, "Semantic error: " + ex.getMessage());
+        }
     }
 
     public record ValidationResult(boolean ok, String errorMessage) {}
