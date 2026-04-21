@@ -1,0 +1,7 @@
+target/
+.idea/
+.vscode/
+
+# Local persistent data for development runs
+.jlite-data/
+.env
