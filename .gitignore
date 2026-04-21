@@ -5,3 +5,4 @@ target/
 # Local persistent data for development runs
 .jlite-data/
 .env
+jlite.properties
