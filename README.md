@@ -11,6 +11,7 @@ JLite is the Java counterpart to [SharpLite](https://github.com/saifadin1/SharpL
 - [Architecture Overview](#architecture-overview)
 - [Module Map](#module-map)
 - [Pre-Implementation Checklist](#pre-implementation-checklist)
+- [Current Capability Snapshot](#current-capability-snapshot)
 - [Feature Status](#feature-status)
 - [Getting Started](#getting-started)
 - [SQL Support](#sql-support)
@@ -163,21 +164,52 @@ This avoids duplicating execution logic in each adapter.
 
 ---
 
+## Current Capability Snapshot
+
+### Supported now
+
+- SQL statements: `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `CREATE TABLE`, `DROP TABLE`, `ALTER TABLE`
+- SQL shapes:
+      - `SELECT <columns>|* FROM <table> [WHERE <expression>]`
+      - `INSERT INTO <table> [(<cols>)] VALUES (...), (...)`
+      - `UPDATE <table> SET <col>=<expr>[, ...] [WHERE <expression>]`
+      - `DELETE FROM <table> [WHERE <expression>]`
+      - `CREATE TABLE <table> (<col> <type>, ...)`
+      - `DROP TABLE <table>`
+      - `ALTER TABLE <table> ADD COLUMN <col> <type> | DROP COLUMN <col>`
+- Query scope: single-table queries only
+- WHERE operators: `AND`, `OR`, `=`, `!=`, `<>`, `<`, `>`, `<=`, `>=`, `+`, `-`, `*`, `/`
+- Literals: string, integer, float, boolean, `NULL`
+- Semantic checks: table/column existence, WHERE boolean enforcement, basic numeric/comparison type checks
+- Execution runtime: in-memory table store by default, plus file-backed persistent table storage via `new QueryEngine(Path storageDir)`
+- CLI: executes supported SQL statements through the shared core engine
+- TCP server: framed JSON protocol with `QUERY` and `CLOSE` request types
+- JDBC: `jdbc:jlite://host:port/db`, `Statement.executeQuery/execute/executeUpdate`, `PreparedStatement` parameter binding, basic `ResultSet` accessors
+
+### Not supported yet
+
+- Query features: `JOIN`, `GROUP BY`, `ORDER BY`, `LIMIT`, `DISTINCT`, subqueries
+- WAL/crash recovery integration for persistent storage path
+- Embedded JDBC mode (`jdbc:jlite:file:...`)
+- Full JDBC surface (batch updates, complete metadata/type mapping)
+
+---
+
 ## Feature Status
 
 | Component | Status |
 |---|---|
 | Lexer | ⬜ TODO |
-| Parser (SELECT, WHERE) | ⬜ TODO |
+| Parser (SELECT, WHERE, DML, basic DDL) | ✅ Implemented (MVP) |
 | AST nodes | ⬜ TODO |
 | Semantic analyser | ⬜ TODO |
 | Heap file storage | ⬜ TODO |
 | Buffer pool (LRU) | ⬜ TODO |
 | Catalogue (in-memory) | ⬜ TODO |
 | Volcano executor | ⬜ TODO |
-| CREATE / DROP TABLE | ⬜ TODO |
-| INSERT / UPDATE / DELETE | ⬜ TODO |
-| SELECT + WHERE | ⬜ TODO |
+| CREATE / DROP TABLE | ✅ Implemented (MVP) |
+| INSERT / UPDATE / DELETE | ✅ Implemented (MVP) |
+| SELECT + WHERE | ✅ Implemented (MVP) |
 | JOIN (NL, hash, merge) | ⬜ TODO |
 | GROUP BY / HAVING | ⬜ TODO |
 | ORDER BY / LIMIT | ⬜ TODO |
@@ -207,6 +239,39 @@ cd jlite
 mvn -pl jlite-cli exec:java -Dexec.mainClass=jlite.cli.Repl
 ```
 
+To persist data across restarts, pass a storage directory via JVM property or environment variable:
+
+```bash
+mvn -pl jlite-cli exec:java -Dexec.mainClass=jlite.cli.Repl -Djlite.storage.dir=./.jlite-data
+```
+
+or:
+
+```bash
+set JLITE_STORAGE_DIR=.\.jlite-data
+mvn -pl jlite-cli exec:java -Dexec.mainClass=jlite.cli.Repl
+```
+
+Configuration source precedence for storage directory (highest to lowest):
+
+1. JVM system property `jlite.storage.dir`
+2. Environment variable `JLITE_STORAGE_DIR`
+3. `jlite.properties` (key: `jlite.storage.dir`) in the working directory
+4. `application.properties` (key: `jlite.storage.dir`) in the working directory
+5. `.env` (key: `JLITE_STORAGE_DIR`) in the working directory
+
+Example `jlite.properties`:
+
+```properties
+jlite.storage.dir=./.jlite-data
+```
+
+Example `.env`:
+
+```dotenv
+JLITE_STORAGE_DIR=./.jlite-data
+```
+
 The CLI starts a REPL session:
 
 ```
@@ -219,6 +284,12 @@ To start the TCP server:
 
 ```bash
 mvn -pl jlite-server exec:java -Dexec.mainClass=jlite.server.TcpServer -Dexec.args="--port 5432"
+```
+
+For persistent server storage:
+
+```bash
+mvn -pl jlite-server exec:java -Dexec.mainClass=jlite.server.TcpServer -Dexec.args="5432" -Djlite.storage.dir=./.jlite-data
 ```
 
 ---
@@ -570,3 +641,7 @@ mvn -pl jlite-server exec:java
 JLite is a learning project. The goal is not to replace PostgreSQL — it is to understand, from first principles, why PostgreSQL makes the choices it does.
 
 Inspired by [SharpLite](https://github.com/saifadin1/SharpLite), [CMU 15-445](https://15445.courses.cs.cmu.edu/), and [Architecture of a Database System](http://db.cs.berkeley.edu/papers/fntdb07-architecture.pdf).
+
+
+mvn -pl jlite-cli -am install -DskipTests
+mvn -pl jlite-cli exec:java "-Dexec.mainClass=jlite.cli.Repl"
