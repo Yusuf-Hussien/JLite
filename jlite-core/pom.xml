@@ -10,7 +10,7 @@
     <version>0.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>jlite-core</artifactId>
-  <n>JLite Core</n>
+  <name>JLite Core</name>
   <description>
     Zero-dependency engine: lexer, parser, AST, semantic analyser,
     planner, optimiser, executor, catalogue, storage, WAL, transactions, locks.
