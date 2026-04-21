@@ -10,7 +10,7 @@
     <version>0.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>jlite-jdbc</artifactId>
-  <n>JLite JDBC Driver</n>
+  <name>JLite JDBC Driver</name>
   <description>
     JDBC 4.2 driver. URL: jdbc:jlite://host:port/db or jdbc:jlite:file:/path/db.
     Auto-registered via META-INF/services/java.sql.Driver (ServiceLoader).
