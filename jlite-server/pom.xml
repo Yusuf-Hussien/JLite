@@ -10,7 +10,7 @@
     <version>0.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>jlite-server</artifactId>
-  <n>JLite Server</n>
+  <name>JLite Server</name>
   <description>TCP server, virtual-thread connection pool, session manager, wire protocol.</description>
   <dependencies>
     <dependency>
