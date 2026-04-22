@@ -99,6 +99,20 @@ class NlAgentTest {
     }
 
     @Test
+    void outOfContextConversationDoesNotExecuteSql() {
+        var engine = new QueryEngine();
+        var schemaBuilder = new SchemaContextBuilder(engine.catalogue());
+        var validator = new SqlValidator(engine.catalogue());
+        var agent = new NlAgent(schemaBuilder, validator, engine, (question, schema) -> "SELECT * FROM users");
+
+        var first = agent.query("HOW ARE U");
+        var second = agent.query("ok who are u");
+
+        assertTrue(first.contains("I am JLite Agent"));
+        assertTrue(second.contains("I am JLite Agent"));
+    }
+
+    @Test
     void fallsBackWhenPrimaryTranslatorReturnsInvalidSql() {
         var engine = new QueryEngine();
         engine.createTable(new TableSchema("users", List.of(

@@ -6,6 +6,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.List;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -14,6 +15,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class GeminiSqlTranslator implements NlAgent.SqlTranslator {
 
     private static final URI API_ROOT = URI.create("https://generativelanguage.googleapis.com/v1beta/models/");
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(20);
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -21,11 +24,11 @@ public class GeminiSqlTranslator implements NlAgent.SqlTranslator {
     private final List<String> models;
 
     public GeminiSqlTranslator(String apiKey, String model) {
-        this(HttpClient.newHttpClient(), new ObjectMapper(), apiKey, List.of(model));
+        this(createHttpClient(), new ObjectMapper(), apiKey, List.of(model));
     }
 
     GeminiSqlTranslator(String apiKey, List<String> models) {
-        this(HttpClient.newHttpClient(), new ObjectMapper(), apiKey, models);
+        this(createHttpClient(), new ObjectMapper(), apiKey, models);
     }
 
     GeminiSqlTranslator(HttpClient httpClient, ObjectMapper objectMapper, String apiKey, List<String> models) {
@@ -70,6 +73,7 @@ public class GeminiSqlTranslator implements NlAgent.SqlTranslator {
         var body = buildRequestBody(prompt);
         var request = HttpRequest.newBuilder()
             .uri(URI.create(API_ROOT + model + ":generateContent?key=" + apiKey))
+            .timeout(REQUEST_TIMEOUT)
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body))
             .build();
@@ -152,5 +156,11 @@ public class GeminiSqlTranslator implements NlAgent.SqlTranslator {
         } catch (IOException ex) {
             throw new UncheckedIOException("Failed to parse Gemini response", ex);
         }
+    }
+
+    private static HttpClient createHttpClient() {
+        return HttpClient.newBuilder()
+            .connectTimeout(CONNECT_TIMEOUT)
+            .build();
     }
 }

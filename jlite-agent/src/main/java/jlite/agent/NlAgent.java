@@ -300,6 +300,13 @@ public class NlAgent {
             return "Hi. Ask me about your data, for example: show users, list rows from users, or a SQL query like SELECT * FROM users.";
         }
 
+        if (normalized.matches(".*\\bhow\\s+are\\s+(you|u)\\b.*")
+            || normalized.matches(".*\\bwho\\s+are\\s+(you|u)\\b.*")
+            || normalized.matches(".*\\bwhat('?s| is)\\s+your\\s+name\\b.*")
+            || normalized.matches(".*\\bthank(s| you)?\\b.*")) {
+            return "I am JLite Agent. I translate natural language to JLite SQL and execute it against your tables. Ask me about your data, for example: users with name Cara, active users, or help.";
+        }
+
         if (normalized.equals("help")
             || normalized.contains("what can you do")
             || normalized.contains("what u can do")
