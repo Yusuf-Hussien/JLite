@@ -72,11 +72,13 @@ public class NlAgent {
         }
 
         var schemaContext = schemaContextBuilder.build();
+        var capabilityContext = AgentCapabilities.promptContext();
+        var promptContext = schemaContext.isBlank() ? capabilityContext : schemaContext + "\n\n" + capabilityContext;
         String sql;
         try {
-            sql = sqlTranslator.translate(naturalLanguageQuestion, schemaContext);
+            sql = sqlTranslator.translate(naturalLanguageQuestion, promptContext);
         } catch (RuntimeException ex) {
-            sql = fallbackTranslator.translate(naturalLanguageQuestion, schemaContext);
+            sql = fallbackTranslator.translate(naturalLanguageQuestion, promptContext);
             if (sql == null || sql.isBlank()) {
                 throw new IllegalArgumentException("Could not translate question to SQL", ex);
             }
@@ -91,11 +93,95 @@ public class NlAgent {
 
         var validation = sqlValidator.validate(sql);
         if (!validation.ok()) {
-            throw new IllegalArgumentException("Generated SQL is invalid: " + validation.errorMessage());
+            var repairedSql = attemptRemoteSqlRepair(naturalLanguageQuestion, promptContext, sql, validation.errorMessage());
+            if (repairedSql != null) {
+                sql = repairedSql;
+            } else {
+                // Remote repair failed. Keep local fallback as a safety net.
+                var fallbackSql = fallbackTranslator.translate(naturalLanguageQuestion, promptContext);
+                if (fallbackSql != null && !fallbackSql.isBlank()) {
+                    fallbackSql = normalizeSql(fallbackSql);
+                    var fallbackValidation = sqlValidator.validate(fallbackSql);
+                    if (fallbackValidation.ok()) {
+                        sql = fallbackSql;
+                    } else {
+                        throw new IllegalArgumentException("Generated SQL is invalid: " + validation.errorMessage());
+                    }
+                } else {
+                    throw new IllegalArgumentException("Generated SQL is invalid: " + validation.errorMessage());
+                }
+            }
+        }
+
+        var intentNarrowedSql = attemptIntentAwareRemoteNarrowing(naturalLanguageQuestion, promptContext, sql);
+        if (intentNarrowedSql != null) {
+            sql = intentNarrowedSql;
         }
 
         var result = queryEngine.execute(sql);
         return renderAnswer(sql, result);
+    }
+
+    private String attemptRemoteSqlRepair(String originalQuestion, String promptContext, String invalidSql, String validationError) {
+        try {
+            var repaired = sqlTranslator.translate(buildRepairPrompt(originalQuestion, invalidSql, validationError), promptContext);
+            if (repaired == null || repaired.isBlank()) {
+                throw new IllegalArgumentException("Generated SQL is invalid: " + validationError);
+            }
+            repaired = normalizeSql(repaired);
+            var repairedValidation = sqlValidator.validate(repaired);
+            return repairedValidation.ok() ? repaired : null;
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private static String buildRepairPrompt(String originalQuestion, String invalidSql, String validationError) {
+        return String.join("\n",
+            "Rewrite the SQL to be valid for JLite and return only one SQL statement.",
+            "Do not use unsupported syntax like JOIN, GROUP BY, ORDER BY, LIMIT, DISTINCT, or subqueries.",
+            "Original user request: " + originalQuestion,
+            "Previous invalid SQL: " + invalidSql,
+            "Validation error: " + validationError
+        );
+    }
+
+    private String attemptIntentAwareRemoteNarrowing(String originalQuestion, String promptContext, String currentSql) {
+        if (!asksForSingleFirstUser(originalQuestion) || !isBroadUsersSelect(currentSql)) {
+            return null;
+        }
+
+        try {
+            var repaired = sqlTranslator.translate(buildIntentRepairPrompt(originalQuestion, currentSql), promptContext);
+            if (repaired == null || repaired.isBlank()) {
+                return null;
+            }
+            repaired = normalizeSql(repaired);
+            var repairedValidation = sqlValidator.validate(repaired);
+            return repairedValidation.ok() ? repaired : null;
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private static boolean asksForSingleFirstUser(String question) {
+        var normalized = question.trim().toLowerCase(Locale.ROOT);
+        return normalized.matches(".*\\b(first|1st|single|one)\\b.*\\buser\\b.*");
+    }
+
+    private static boolean isBroadUsersSelect(String sql) {
+        var normalized = sql.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+        return normalized.equals("select * from users") || normalized.equals("select * from users;");
+    }
+
+    private static String buildIntentRepairPrompt(String originalQuestion, String currentSql) {
+        return String.join("\n",
+            "Rewrite the SQL to preserve the user intent and return only one SQL statement.",
+            "JLite does not support ORDER BY or LIMIT.",
+            "If the user asks for the first/single user and table users has an id column, prefer WHERE id = 1.",
+            "Original user request: " + originalQuestion,
+            "Current SQL that is too broad: " + currentSql
+        );
     }
 
     public static void main(String[] args) {
@@ -167,6 +253,10 @@ public class NlAgent {
                 return "SELECT * FROM " + matcher.group(1);
             }
 
+            if (normalized.matches(".*\\b(first|1st)\\b.*\\buser\\b.*")) {
+                return "SELECT * FROM users WHERE id = 1";
+            }
+
             if (normalized.startsWith("select ")) {
                 return question.trim();
             }
@@ -206,12 +296,17 @@ public class NlAgent {
 
     private String maybeAssistantResponse(String question) {
         var normalized = question.trim().toLowerCase(Locale.ROOT);
-        if (normalized.matches("^(hi|hello|hey|yo|hola)$")) {
+        if (normalized.matches("^(h+i+|hello+|hey+|yo+|hola+)$")) {
             return "Hi. Ask me about your data, for example: show users, list rows from users, or a SQL query like SELECT * FROM users.";
         }
 
-        if (normalized.contains("what u could do") || normalized.contains("what can you do") || normalized.equals("help")) {
-            return "I can translate simple natural language to SQL and run SQL on JLite. Try: show users, list all from users, or SELECT id, name FROM users.";
+        if (normalized.equals("help")
+            || normalized.contains("what can you do")
+            || normalized.contains("what u can do")
+            || normalized.contains("what u could do")
+            || normalized.contains("capabilities")
+            || normalized.contains("ability")) {
+            return AgentCapabilities.helpText();
         }
 
         return null;

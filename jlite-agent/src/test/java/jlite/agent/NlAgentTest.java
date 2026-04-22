@@ -2,6 +2,7 @@ package jlite.agent;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -66,6 +67,107 @@ class NlAgentTest {
         var answer = agent.query("hi");
 
         assertTrue(answer.toLowerCase().contains("ask me about your data"));
+    }
+
+    @Test
+    void helpResponseListsSupportedStatementTypes() {
+        var engine = new QueryEngine();
+        var schemaBuilder = new SchemaContextBuilder(engine.catalogue());
+        var validator = new SqlValidator(engine.catalogue());
+        var agent = new NlAgent(schemaBuilder, validator, engine, (question, schema) -> {
+            throw new RuntimeException("HTTP 429 quota exceeded");
+        });
+
+        var answer = agent.query("help");
+
+        assertTrue(answer.contains("SELECT"));
+        assertTrue(answer.contains("INSERT"));
+        assertTrue(answer.contains("ALTER TABLE"));
+    }
+
+    @Test
+    void capabilityPromptWhatUCanDoReturnsHelpText() {
+        var engine = new QueryEngine();
+        var schemaBuilder = new SchemaContextBuilder(engine.catalogue());
+        var validator = new SqlValidator(engine.catalogue());
+        var agent = new NlAgent(schemaBuilder, validator, engine, (question, schema) -> "SELECT * FROM users");
+
+        var answer = agent.query("what u can do");
+
+        assertTrue(answer.contains("Supported statements:"));
+        assertTrue(answer.contains("SELECT"));
+    }
+
+    @Test
+    void fallsBackWhenPrimaryTranslatorReturnsInvalidSql() {
+        var engine = new QueryEngine();
+        engine.createTable(new TableSchema("users", List.of(
+            new Column("id", DataType.INT, false, true),
+            new Column("name", DataType.TEXT, true, false)
+        )));
+        engine.insertRow("users", Map.of("id", 1L, "name", "Alice"));
+
+        var schemaBuilder = new SchemaContextBuilder(engine.catalogue());
+        var validator = new SqlValidator(engine.catalogue());
+        var agent = new NlAgent(schemaBuilder, validator, engine, (question, schema) -> "SELECT * FROM users LIMIT 1");
+
+        var answer = agent.query("give me the first user");
+
+        assertTrue(answer.contains("SQL: SELECT * FROM users WHERE id = 1"));
+        assertTrue(answer.contains("Alice"));
+    }
+
+    @Test
+    void retriesPrimaryTranslatorWithRepairPromptBeforeLocalFallback() {
+        var engine = new QueryEngine();
+        engine.createTable(new TableSchema("users", List.of(
+            new Column("id", DataType.INT, false, true),
+            new Column("name", DataType.TEXT, true, false)
+        )));
+        engine.insertRow("users", Map.of("id", 1L, "name", "Alice"));
+
+        var callCount = new AtomicInteger(0);
+        var schemaBuilder = new SchemaContextBuilder(engine.catalogue());
+        var validator = new SqlValidator(engine.catalogue());
+        var agent = new NlAgent(schemaBuilder, validator, engine, (question, schema) -> {
+            if (callCount.incrementAndGet() == 1) {
+                return "SELECT * FROM users LIMIT 1";
+            }
+            return "SELECT * FROM users WHERE id = 1";
+        });
+
+        var answer = agent.query("give me the first user");
+
+        assertEquals(2, callCount.get());
+        assertTrue(answer.contains("SQL: SELECT * FROM users WHERE id = 1"));
+        assertTrue(answer.contains("Alice"));
+    }
+
+    @Test
+    void narrowsBroadRemoteSqlForFirstUserIntent() {
+        var engine = new QueryEngine();
+        engine.createTable(new TableSchema("users", List.of(
+            new Column("id", DataType.INT, false, true),
+            new Column("name", DataType.TEXT, true, false)
+        )));
+        engine.insertRow("users", Map.of("id", 1L, "name", "Alice"));
+        engine.insertRow("users", Map.of("id", 2L, "name", "Bob"));
+
+        var callCount = new AtomicInteger(0);
+        var schemaBuilder = new SchemaContextBuilder(engine.catalogue());
+        var validator = new SqlValidator(engine.catalogue());
+        var agent = new NlAgent(schemaBuilder, validator, engine, (question, schema) -> {
+            if (callCount.incrementAndGet() == 1) {
+                return "SELECT * FROM users";
+            }
+            return "SELECT * FROM users WHERE id = 1";
+        });
+
+        var answer = agent.query("give me the first user");
+
+        assertEquals(2, callCount.get());
+        assertTrue(answer.contains("SQL: SELECT * FROM users WHERE id = 1"));
+        assertTrue(answer.contains("Alice"));
     }
 
     @Test
