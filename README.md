@@ -381,7 +381,7 @@ Message framing uses a 4-byte length prefix followed by a JSON (later: binary) p
 
 ## MCP Server
 
-The MCP (Model Context Protocol) server exposes JLite as a set of AI-callable tools. Any MCP-compatible agent (Claude, Cursor, etc.) can connect and interact with the database through these tools.
+The MCP (Model Context Protocol) server exposes JLite as a set of AI-callable tools. Any MCP-compatible agent can connect and interact with the database through these tools.
 
 ### Tools exposed
 
@@ -395,20 +395,32 @@ The MCP (Model Context Protocol) server exposes JLite as a set of AI-callable to
 | `commit_transaction` | Commit by TX token |
 | `rollback_transaction` | Rollback by TX token |
 
-The MCP server runs over stdio (default) or SSE transport, making it usable both locally and via a remote endpoint.
+The MCP server runs over stdio and uses the shared storage configuration resolver, so it can work against an in-memory catalogue or a persistent storage directory.
+
+Run it locally:
+
+```bash
+mvn -pl jlite-mcp exec:java -Dexec.mainClass=jlite.mcp.McpServer
+```
+
+To use persistent storage:
+
+```bash
+mvn -pl jlite-mcp exec:java -Dexec.mainClass=jlite.mcp.McpServer -Djlite.storage.dir=./.jlite-data
+```
 
 ---
 
 ## Natural Language Agent
 
-The NL Agent is a thin layer that accepts an English question, builds a schema-aware prompt, calls an LLM (Claude by default), receives SQL back, validates it against the live catalogue, and executes it through the normal query pipeline.
+The NL Agent accepts an English question, builds a schema-aware prompt, calls Gemini when `GEMINI_API_KEY` is available, validates the SQL, and executes it through the normal query pipeline. When remote Gemini is enabled, it probes a small flash-model list in order and falls back locally if none of them have quota. The default configured model is `gemini-2.0-flash-lite`.
 
 ```
 "Show me all users who signed up last month"
         ↓
   SchemaContextBuilder   (injects live table/column names)
         ↓
-  LLM call (Claude claude-sonnet-4-20250514)
+      Gemini call (probes `gemini-2.0-flash-lite`, `gemini-2.0-flash`, and `gemini-flash-latest` first)
         ↓
   SQL: SELECT * FROM users WHERE signup_date >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
         ↓
@@ -420,6 +432,29 @@ The NL Agent is a thin layer that accepts an English question, builds a schema-a
 ```
 
 The agent is intentionally stateless between turns. Conversation history (if needed) is managed by the calling application.
+
+Configure Gemini via either `GEMINI_API_KEY` in `.env` or in `jlite.properties`. The agent also honors `GEMINI_MODEL` if you want to override the default model.
+
+If Gemini returns HTTP 429 on every flash model, the key/project has no free-tier generation quota for that API and the agent will stay on the local fallback.
+
+Run it locally:
+
+```bash
+mvn -pl jlite-agent exec:java -Dexec.mainClass=jlite.agent.NlAgent
+```
+
+On Windows PowerShell, quote the `-D...` argument:
+
+```powershell
+mvn -pl jlite-agent exec:java "-Dexec.mainClass=jlite.agent.NlAgent"
+```
+
+Example environment setup:
+
+```dotenv
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-2.0-flash-lite
+```
 
 ---
 
