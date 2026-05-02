@@ -182,16 +182,20 @@ This avoids duplicating execution logic in each adapter.
 - Literals: string, integer, float, boolean, `NULL`
 - Semantic checks: table/column existence, WHERE boolean enforcement, basic numeric/comparison type checks
 - Execution runtime: in-memory table store by default, plus file-backed persistent table storage via `new QueryEngine(Path storageDir)`
-- CLI: executes supported SQL statements through the shared core engine
-- TCP server: framed JSON protocol with `QUERY` and `CLOSE` request types
+- CLI: executes supported SQL statements through the shared core engine (interactive REPL)
+- TCP server: framed JSON protocol with `QUERY` and `CLOSE` request types, virtual-thread-per-connection handling
 - JDBC: `jdbc:jlite://host:port/db`, `Statement.executeQuery/execute/executeUpdate`, `PreparedStatement` parameter binding, basic `ResultSet` accessors
+- MCP server: stdio transport with `initialize`, `tools/list`, and `tools/call`; tools include `execute_query` (and alias `execute_sql`)
+- NL agent: schema-aware SQL generation, SQL validation + retry loop, Gemini model probing/fallback, local heuristic fallback
 
 ### Not supported yet
 
 - Query features: `JOIN`, `GROUP BY`, `ORDER BY`, `LIMIT`, `DISTINCT`, subqueries
-- WAL/crash recovery integration for persistent storage path
+- WAL/crash recovery integration for persistent storage path (persistent files work, but WAL/recovery is not integrated)
 - Embedded JDBC mode (`jdbc:jlite:file:...`)
 - Full JDBC surface (batch updates, complete metadata/type mapping)
+- MCP advanced tools (`list_tables`, `describe_table`, `get_execution_plan`, transaction tools)
+- Execution plan visualiser
 
 ---
 
@@ -199,14 +203,14 @@ This avoids duplicating execution logic in each adapter.
 
 | Component | Status |
 |---|---|
-| Lexer | ⬜ TODO |
+| Lexer | ✅ Implemented (MVP) |
 | Parser (SELECT, WHERE, DML, basic DDL) | ✅ Implemented (MVP) |
-| AST nodes | ⬜ TODO |
-| Semantic analyser | ⬜ TODO |
-| Heap file storage | ⬜ TODO |
-| Buffer pool (LRU) | ⬜ TODO |
-| Catalogue (in-memory) | ⬜ TODO |
-| Volcano executor | ⬜ TODO |
+| AST nodes | ✅ Implemented (MVP subset) |
+| Semantic analyser | ✅ Implemented (MVP) |
+| Heap file storage | ⚠️ Partially implemented (file-backed table store) |
+| Buffer pool (LRU) | ⚠️ Partially implemented (basic LRU cache) |
+| Catalogue (in-memory) | ✅ Implemented (MVP) |
+| Volcano executor | ⚠️ Partially implemented (single-table scan/filter/project + DML path) |
 | CREATE / DROP TABLE | ✅ Implemented (MVP) |
 | INSERT / UPDATE / DELETE | ✅ Implemented (MVP) |
 | SELECT + WHERE | ✅ Implemented (MVP) |
@@ -216,15 +220,15 @@ This avoids duplicating execution logic in each adapter.
 | B-Tree index | ⬜ TODO |
 | Hash index | ⬜ TODO |
 | WAL + crash recovery | ⬜ TODO |
-| Transactions (ACID) | ⬜ TODO |
+| Transactions (ACID) | ⚠️ Partially implemented (skeleton only) |
 | MVCC | ⬜ TODO |
 | Lock manager | ⬜ TODO |
-| TCP Server | ⬜ TODO |
-| Virtual thread connection pool | ⬜ TODO |
-| CLI Shell / REPL | ⬜ TODO |
-| JDBC Driver | ⬜ TODO |
-| MCP Server | ⬜ TODO |
-| NL Agent | ⬜ TODO |
+| TCP Server | ✅ Implemented (MVP) |
+| Virtual thread connection pool | ✅ Implemented (MVP) |
+| CLI Shell / REPL | ✅ Implemented (MVP) |
+| JDBC Driver | ✅ Implemented (MVP) |
+| MCP Server | ⚠️ Partially implemented (core protocol + execute query tool) |
+| NL Agent | ⚠️ Partially implemented (schema-aware translation + validation loop) |
 | Execution plan visualiser | ⬜ TODO |
 
 ---
